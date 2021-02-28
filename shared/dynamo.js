@@ -16,7 +16,7 @@ exports.putEvent = (event) => {
                 S: event_parse.event_id
             },
             "license": {
-                S: event_parse.license ?? ''
+                S: event_parse.license ? event_parse.license : ''
             },
             "domain": {
                 S: event_parse.domain
