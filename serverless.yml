@@ -1,0 +1,38 @@
+service: handl-js
+
+provider:
+  name: aws
+  stage: prod
+  profile: handl
+  endpointType: REGIONAL
+
+package:
+  exclude:
+    - node_modules/**
+    - .git/**
+
+plugins:
+  - serverless-apigateway-service-proxy
+
+custom:
+  apiGatewayServiceProxies:
+    - sqs:
+        path: /event
+        method: post
+        queueName: { 'Fn::GetAtt': ['SQSQueue', 'QueueName'] }
+        cors: true
+
+resources:
+  Resources:
+    SQSQueue:
+      Type: 'AWS::SQS::Queue'
+
+functions:
+  sqs2dynamo:
+    handler: functions/sqs2dynamo.handler
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - SQSQueue
+              - Arn
