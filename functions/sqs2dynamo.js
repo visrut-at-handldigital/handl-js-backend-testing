@@ -21,7 +21,7 @@ if (require.main === module) {
             {
                 "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
                 "receiptHandle": "AQEBwJnKyrHigUMZj6rYigCgxlaS3SLy0a...",
-                "body": '{"event_id":"123","license":"1234","domain":"haktansuren.com","ip":"192.168.1.1","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.192 Safari/537.36","url":"https://handl-js/"}',
+                "body": '{"domain":"handl-js","ip":"2600:1700:156:410:c466:ca4b:28ae:45ff","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.192 Safari/537.36","url":"https://handl-js/","event_id":"b9b4296b-d2fa-427b-8944-84f569f204fb","license":"NA","date":"2021-03-05T05:51:04.814Z","handl_utm":{"utm_source":"sourcex","utm_medium":"medium","utm_term":"term","utm_content":"content","utm_campaign":"campaign","gaclientid":"520309381.1613187441","handl_custom1":"customvalue1"}}',
                 "attributes": {
                     "ApproximateReceiveCount": "1",
                     "SentTimestamp": "1545082649183",
