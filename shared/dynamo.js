@@ -20,21 +20,21 @@ exports.putEvent = (event) => {
                 S: event_parse.license ? event_parse.license : ''
             },
             "domain": {
-                S: event_parse.domain
+                S: event_parse.domain ? event_parse.domain : ''
             },
             "ip": {
-                S: event_parse.ip
+                S: event_parse.ip ? event_parse.ip : ''
             },
             "user_agent": {
-                S: event_parse.user_agent
+                S: event_parse.user_agent ? event_parse.user_agent : ''
             },
             "url": {
-                S: event_parse.url
+                S: event_parse.url ? event_parse.url : ''
             },
             "date": {
-                S: event_parse.date
+                S: event_parse.date ? event_parse.date : new Date().toISOString()
             },
-            "handl_utm": AWS.DynamoDB.Converter.input(event_parse.handl_utm)
+            "handl_utm": AWS.DynamoDB.Converter.input(event_parse.handl_utm ? event_parse.handl_utm : {})
         },
         TableName: "HandLJSEvents"
     };
