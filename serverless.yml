@@ -32,17 +32,29 @@ resources:
       Type: 'AWS::SQS::Queue'
 
 functions:
-  sqs2dynamo:
-    handler: functions/sqs2dynamo.handler
+  sqs2firehose:
+    handler: functions/sqs2firehose.handler
     events:
       - sqs:
           arn:
             Fn::GetAtt:
               - SQSQueue
               - Arn
-    iamRoleStatementsName: lambda-sqs2dynamo-custom-role
+    iamRoleStatementsName: lambda-sqs2firehose-custom-role
     iamRoleStatements:
         - Effect: "Allow"
           Action:
-            - dynamodb:PutItem
-          Resource: { 'Fn::Join': [ ':', [ 'arn:aws:dynamodb', { Ref: 'AWS::Region' }, { Ref: 'AWS::AccountId' }, 'table/HandLJSEvents' ] ] }
+            - firehose:PutRecord
+          Resource: { 'Fn::Join': [ ':', [ 'arn:aws:firehose', { Ref: 'AWS::Region' }, { Ref: 'AWS::AccountId' }, 'deliverystream/*' ] ] }
+        - Effect: "Allow"
+          Action:
+            - firehose:ListDeliveryStreams
+          Resource: "*"
+
+  report:
+    handler: functions/report.handler
+    events:
+      - httpApi:
+          path: /report
+          method: GET
+          cors: false

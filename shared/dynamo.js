@@ -104,6 +104,156 @@ exports.bulkDelete = async (event) => {
 }
 
 
+exports.handljs = async (event) => {
+    let dynamodb = new AWS.DynamoDB();
+
+    const params = {
+        TableName: 'UTMGrabberLicense',
+        IndexName:'email-index',
+        ProjectionExpression: "license_key, report",
+        KeyConditions:{
+            'email': {
+                'AttributeValueList': [
+                    {
+                        'S': event["email"]
+                    }
+                ],
+                'ComparisonOperator': 'EQ'
+            },
+        },
+        FilterExpression: "#ps = :ps AND #s = :s AND contains (#ad, :ad)",
+        ExpressionAttributeNames: {
+            "#ps": "package_slug",
+            "#s": "status",
+            "#ad": "allowed_domains"
+        },
+        ExpressionAttributeValues: {
+            ":ps": {
+                "S": "handl-js"
+            },
+            ":s": {
+                "S": "activated"
+            },
+            ":ad": {
+                "S": event["domain"]
+
+            }
+        }
+    };
+
+    console.log("dynamodb.query started with the params below")
+    console.log(params)
+
+    try{
+        return await dynamodb.query(params).promise();
+    }catch(e){
+        return {err: "Database Error: "+e.message}
+    }
+}
+
+exports.handljs_updateReport = async (event) => {
+    process.env.TZ = 'GMT'
+
+    let dynamodb = new AWS.DynamoDB();
+
+    const params = {
+        TableName: 'UTMGrabberLicense',
+        Key:{
+            'license_key': {
+                'S': event.license_key
+            },
+        },
+        ExpressionAttributeNames: {
+            "#rn": [event.report_name, event.start, event.end].join('_'),
+            "#date": "date"
+        },
+        ExpressionAttributeValues: {
+            ":qid": {
+                'S': event.QueryExecutionId
+            },
+            ":date": {
+                'S': new Date(new Date().getTime()+1000*60*60*6).toISOString()
+            }
+        },
+        UpdateExpression: "SET report.#rn.QueryExecutionId = :qid, report.#rn.#date = :date"
+    };
+
+    console.log("dynamodb.query started with the params below")
+    console.log(params)
+
+    try{
+        return await dynamodb.updateItem(params).promise();
+    }catch(e){
+        if ( e.code == 'ValidationException' ){
+
+            console.log("Rerunning")
+            const params = {
+                TableName: 'UTMGrabberLicense',
+                Key:{
+                    'license_key': {
+                        'S': event.license_key
+                    },
+                },
+                ExpressionAttributeNames: {
+                    "#rn": [event.report_name, event.start, event.end].join('_'),
+                },
+                ExpressionAttributeValues: {
+                    ":rn": {
+                        'M': {
+                            "QueryExecutionId": { "S" : event.QueryExecutionId },
+                            "date": { "S": new Date(new Date().getTime()+1000*60*60*6).toISOString() }
+                        }
+                    }
+                },
+                UpdateExpression: "SET report.#rn = :rn"
+            };
+            return await dynamodb.updateItem(params).promise();
+        }
+        return {err: "Database Error: "+e.message}
+    }
+
+}
+
+exports.handljs_getReport = async (event) => {
+    process.env.TZ = 'GMT'
+
+    let dynamodb = new AWS.DynamoDB();
+
+    const params = {
+        TableName: 'UTMGrabberLicense',
+        KeyConditions:{
+            'license_key': {
+                'AttributeValueList': [
+                    {
+                        'S': event.license_key
+                    }
+                ],
+                'ComparisonOperator': 'EQ'
+            },
+        },
+        ExpressionAttributeNames: {
+            "#rn": [event.report_name, event.start, event.end].join('_'),
+            "#date": "date"
+        },
+        ExpressionAttributeValues: {
+            ":date": {
+                'S': new Date().toISOString()
+            }
+        },
+        FilterExpression: "report.#rn.#date >= :date",
+    };
+
+    console.log("dynamodb.query started with the params below")
+    console.log(params)
+
+    try{
+        return await dynamodb.query(params).promise();
+    }catch(e){
+        return {err: "Database Error: "+e.message}
+    }
+}
+
+
 
 if (require.main === module) {
     var event = {
