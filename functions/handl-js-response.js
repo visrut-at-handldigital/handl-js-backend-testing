@@ -19,34 +19,43 @@ exports.handler = (event, context, callback) => {
     const querystring = request.querystring;
     const license = getParameterByName('license',querystring);
 
-    console.log("Domain: "+domain);
-    console.log("License: "+license);
+    if (license != ''){
+        console.log("Domain: "+domain);
+        console.log("License: "+license);
 
-    getInvoice(license).then( license => {
-        console.log(license)
-        console.log(request)
-        if (license.Count > 0){
+        getInvoice(license).then( license => {
+            console.log(license)
+            console.log(request)
+            if (license.Count > 0){
+                callback(null, request);
+                return;
+            }else{
+                const response = {
+                    status: '402',
+                    statusDescription: 'Payment Required',
+                    body: "Payment required!"
+                };
+                callback(null, response);
+            }
+
+
+        }).catch( err => {
+            console.log("entering catch block");
+            console.log(request)
+            console.log(err.message);
+
+            //let them still use the plugin
             callback(null, request);
             return;
-        }else{
-            const response = {
-                status: '402',
-                statusDescription: 'Payment Required',
-                body: "Pay me :)"
-            };
-            callback(null, response);
-        }
-
-
-    }).catch( err => {
-        console.log("entering catch block");
-        console.log(request)
-        console.log(err.message);
-
-        //let them still use the plugin
-        callback(null, request);
-        return;
-    })
+        })
+    }else{
+        const response = {
+            status: '402',
+            statusDescription: 'You need a license to use',
+            body: "Contact utmsimple.com to get a license"
+        };
+        callback(null, response);
+    }
 };
 
 function getInvoice(license_key){
