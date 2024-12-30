@@ -27,3 +27,4 @@ dist/
 .actrc
 .serverless
 .nvmrc
+/lib

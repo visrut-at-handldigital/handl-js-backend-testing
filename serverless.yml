@@ -13,10 +13,19 @@ package:
   exclude:
     - node_modules/**
     - .git/**
+    - build-layer.sh
 
 plugins:
   - serverless-apigateway-service-proxy
   - serverless-iam-roles-per-function
+  - serverless-plugin-layer-manager
+
+layers:
+  hjnodelib:
+    path: lib
+    name: hj-nodelib
+    description: Node Modules Shared Libs
+    retain: false
 
 custom:
   apiGatewayServiceProxies:
@@ -57,4 +66,23 @@ functions:
       - httpApi:
           path: /report
           method: GET
-          cors: false
+
+  response:
+    handler: functions/handl-js-response.handler
+    timeout: 5
+    iamRoleStatementsName: handl-js-response-custom-role
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - dynamodb:Query
+        Resource: { 'Fn::Join': [ ':', [ 'arn:aws:dynamodb', '*', { Ref: 'AWS::AccountId' }, 'table/UTMGrabberLicense' ] ] }
+
+  utmsimpleresponse:
+    handler: functions/utmsimple-js-response.handler
+    timeout: 5
+    iamRoleStatementsName: utmsimple-js-response-custom-role
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - dynamodb:Query
+        Resource: { 'Fn::Join': [ ':', [ 'arn:aws:dynamodb', '*', { Ref: 'AWS::AccountId' }, 'table/UTMSimpleLicenses' ] ] }

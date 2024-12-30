@@ -1,4 +1,7 @@
 var AWS = require("aws-sdk");
+var tldjs = require("./tld/index")
+const { getDomain } = tldjs;
+
 
 //Local settings only!!! not for production
 // var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
@@ -16,11 +19,8 @@ exports.handler = (event, context, callback) => {
     let domain =  headers.referer ? headers.referer[0].value : '';
 
     if ( domain != '' ){
-        const urlObject = new URL(domain);
 
-        const hostName = urlObject.hostname;
-        domain = hostName.replace(/^[^.]+\./g, '');
-        // const protocol = urlObject.protocol;
+        domain = getDomain(domain)
 
         const querystring = request.querystring;
         const license = getParameterByName('license',querystring);
@@ -49,8 +49,6 @@ exports.handler = (event, context, callback) => {
                     };
                     callback(null, response);
                 }
-
-
             }).catch( err => {
                 console.log("entering catch block");
                 console.log(request)
@@ -85,7 +83,7 @@ function getInvoice(license_key, domain){
     var dynamodb = new AWS.DynamoDB();
 
     const params = {
-        TableName: 'UTMGrabberLicense',
+        TableName: 'UTMSimpleLicenses',
         KeyConditionExpression:"#license = :license",
         ExpressionAttributeNames:{
             "#license": "license_key",
@@ -94,12 +92,11 @@ function getInvoice(license_key, domain){
         },
         ExpressionAttributeValues: {
             ":license": { S: license_key },
-            ":package": { S: "handl-js" },
             ":st": { S: "activated" },
             ":ad": { S: domain }
         },
-        FilterExpression: "package_slug = :package AND #st = :st AND contains(#ad,:ad)",
-        ProjectionExpression: 'allowed_domains, #st'
+        FilterExpression: "#st = :st AND contains(#ad,:ad)",
+        ProjectionExpression: '#ad, #st'
     };
 
     // console.log("dynamodb.query started with the params below")
@@ -127,7 +124,7 @@ if (require.main === module) {
                             "referer": [
                                 {
                                     "key": "referer",
-                                    "value": "https://watch.pompaworkshop.com"
+                                    "value": "https://utmsimple.com"
                                 }
                             ]
                         },
