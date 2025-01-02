@@ -5,7 +5,7 @@ const { fromIni } = require("@aws-sdk/credential-providers");
 // For local development with profile 'handl', uncomment the credentials line below
 const firehose = new Firehose({ 
     region: 'us-east-1',
-    credentials: fromIni({ profile: 'handl' }) // Comment out for production
+    // credentials: fromIni({ profile: 'handl' }) // Comment out for production
 });
 
 exports.handler = async (event, context) => {
