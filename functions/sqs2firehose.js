@@ -64,12 +64,55 @@ exports.handler = function(event, context) {
                 }else{
                     //No domain
                 }
+      }
+    }
+  });
 
+  /* new logic */
+  try {
+    for (const record of event.Records) {
+      const ddbRecord = JSON.parse(record.body);
+      let toFirehose = {};
 
+      if (ddbRecord["domain"]) {
+        ddbRecord["domain"] = ddbRecord["domain"].replace(/^.www/, "");
+        let domain = ddbRecord["domain"].replace(/^.www/, "").replace(/^./, "");
 
+        // Prepare data to send to Firehose
+        for (const c in ddbRecord) {
+          if (c !== "handl_utm") {
+            toFirehose[c] = ddbRecord[c];
+          } else {
+            const handl_obj = ddbRecord[c];
+            for (const cc in handl_obj) {
+              toFirehose[cc] = handl_obj[cc];
             }
+          }
         }
-    })
+
+        let jtoFirehose = JSON.stringify(toFirehose);
+        let params = {
+          DeliveryStreamName: "UTMSimpleSingleStream",
+          Record: {
+            Data: jtoFirehose,
+          },
+        };
+
+        try {
+          firehose.putRecord(params, function (err, data) {
+            if (err) console.log(err, err.stack); // an error occurred
+            else console.log(data); // successful response
+          });
+        } catch (err) {
+          console.error("Error sending record to Firehose:", err);
+        }
+      } else {
+        console.warn("No domain found in record:", record.body);
+      }
+    }
+  } catch (e) {
+    console.log(e);
+  }
 
     return `Successfully processed ${event.Records.length} records.`;
 }
