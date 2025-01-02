@@ -1,15 +1,13 @@
-var AWS = require("aws-sdk");
+const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+// const { fromIni } = require("@aws-sdk/credential-providers");
 
-//Local settings only!!! not for production
-// var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
-// AWS.config.update({credentials: credentials});
-
-AWS.config.update({region: 'us-east-1'});
-
+const dynamodb = new DynamoDB({ 
+    region: 'us-east-1'
+    // credentials: process.env.AWS_PROFILE ? fromIni({ profile: 'handl' }) : undefined
+});
 
 exports.putEvent = (event) => {
     let event_parse = JSON.parse(event)
-    var dynamodb = new AWS.DynamoDB();
 
     var params = {
         Item: {
@@ -34,7 +32,7 @@ exports.putEvent = (event) => {
             "date": {
                 S: event_parse.date ? event_parse.date : new Date().toISOString()
             },
-            "handl_utm": AWS.DynamoDB.Converter.input(event_parse.handl_utm ? event_parse.handl_utm : {})
+            "handl_utm": JSON.stringify(event_parse.handl_utm ? event_parse.handl_utm : {})
         },
         TableName: "HandLJSEvents"
     };
@@ -45,7 +43,6 @@ exports.putEvent = (event) => {
 }
 
 exports.deleteBasedonConditions = (event) => {
-    let dynamodb = new AWS.DynamoDB();
     const params = {
         TableName: event.table,
         Key:{
@@ -69,8 +66,6 @@ exports.deleteBasedonConditions = (event) => {
 }
 
 exports.bulkDelete = async (event) => {
-    let dynamodb = new AWS.DynamoDB();
-
     const params = {
         TableName: event.table,
         ProjectionExpression: "event_id",
@@ -103,10 +98,7 @@ exports.bulkDelete = async (event) => {
     })
 }
 
-
 exports.handljs = async (event) => {
-    let dynamodb = new AWS.DynamoDB();
-
     const params = {
         TableName: 'UTMGrabberLicense',
         IndexName:'email-index',
@@ -136,7 +128,6 @@ exports.handljs = async (event) => {
             },
             ":ad": {
                 "S": event["domain"]
-
             }
         }
     };
@@ -153,8 +144,6 @@ exports.handljs = async (event) => {
 
 exports.handljs_updateReport = async (event) => {
     process.env.TZ = 'GMT'
-
-    let dynamodb = new AWS.DynamoDB();
 
     const params = {
         TableName: 'UTMGrabberLicense',
@@ -211,13 +200,10 @@ exports.handljs_updateReport = async (event) => {
         }
         return {err: "Database Error: "+e.message}
     }
-
 }
 
 exports.handljs_getReport = async (event) => {
     process.env.TZ = 'GMT'
-
-    let dynamodb = new AWS.DynamoDB();
 
     const params = {
         TableName: 'UTMGrabberLicense',
@@ -253,8 +239,6 @@ exports.handljs_getReport = async (event) => {
     }
 }
 
-
-
 if (require.main === module) {
     var event = {
         'table': 'HandLJSEvents',
@@ -267,7 +251,4 @@ if (require.main === module) {
     //     'id': '078db9ec-46f3-4c36-9cb4-1cdbec661ba7'
     // }
     // this.deleteBasedonConditions(event)
-
-
-
 }

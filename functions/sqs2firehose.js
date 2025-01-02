@@ -1,142 +1,137 @@
-var AWS = require("aws-sdk");
+const { Firehose } = require("@aws-sdk/client-firehose");
+const { fromIni } = require("@aws-sdk/credential-providers");
 
-//Local settings only!!! not for production
-// var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
-// AWS.config.update({credentials: credentials});
+// Configure Firehose client
+// For local development with profile 'handl', uncomment the credentials line below
+const firehose = new Firehose({ 
+    region: 'us-east-1',
+    credentials: fromIni({ profile: 'handl' }) // Comment out for production
+});
 
-AWS.config.update({region: 'us-east-1'});
-
-exports.handler = function(event, context) {
-    // console.log(event)
-
-    var firehose = new AWS.Firehose();
-
-    var params2 = {
+exports.handler = async (event, context) => {
+    const params = {
         DeliveryStreamType: "DirectPut",
         ExclusiveStartDeliveryStreamName: 'handl-js',
-        Limit: '100'
+        Limit: 100
     };
-    firehose.listDeliveryStreams(params2,function(err,lsd){
-        if (err) console.log(err, err.stack); // an error occurred
-        else {
-            // console.log(lsd)
-            let streams = lsd['DeliveryStreamNames']
 
-            for (const record of event.Records) {
-                // console.log('DynamoDB Record: %j', record.body);
+    try {
+        const { DeliveryStreamNames: streams } = await firehose.listDeliveryStreams(params);
+        
+        for (const record of event.Records) {
+            console.log(record.eventID);
+            console.log(record.eventName);
+            console.log('DynamoDB Record: %j', record.dynamodb);
 
-                const ddbRecord = JSON.parse(record.body);
-                let toFirehose = {}
+            if (record.eventName !== 'REMOVE') {
+                const streamRecord = record.dynamodb;
+                const ddbRecord = streamRecord.NewImage;
+                const toFirehose = {};
+                const domain = ddbRecord['domain']['S'].replace(/^.www/, '').replace(/^./, '');
 
-                if (ddbRecord['domain']){
-                    ddbRecord['domain'] = ddbRecord['domain'].replace(/^.www/, '')
-                    let domain = ddbRecord['domain'].replace(/^.www/, '').replace(/^./, '')
-
-                    for (const c in ddbRecord) {
-                        if (c != 'handl_utm')
-                            toFirehose[c] = ddbRecord[c]
-                        else {
-                            const handl_obj = ddbRecord[c]
-                            for (const cc in handl_obj) {
-                                toFirehose[cc] = handl_obj[cc]
-                            }
+                for (const key in ddbRecord) {
+                    if (key !== 'handl_utm') {
+                        toFirehose[key] = Object.values(ddbRecord[key])[0];
+                    } else {
+                        const handl_obj = Object.values(ddbRecord[key])[0];
+                        for (const utm_key in handl_obj) {
+                            toFirehose[utm_key] = Object.values(handl_obj[utm_key])[0];
                         }
                     }
-                    // console.log(toFirehose)
-
-                    let jtoFirehose = JSON.stringify(toFirehose)
-                    let delivery_stream = 'handl-js-' + domain
-                    if (streams.indexOf(delivery_stream) === -1){
-                        delivery_stream = 'HandJStoS3'
-                    }
-                    // console.log("Delivery Stream Predicted As:" + delivery_stream)
-
-                    let params3 = {
-                        DeliveryStreamName: delivery_stream, /* required */
-                        Record: { /* required */
-                            Data: jtoFirehose + '\n'
-                        }
-                    };
-                    firehose.putRecord(params3, function(err, data) {
-                        if (err) console.log(err, err.stack); // an error occurred
-                        //else     console.log(data);           // successful response
-                    });
-                }else{
-                    //No domain
                 }
-      }
-    }
-  });
 
-  /* new logic */
-  try {
-    for (const record of event.Records) {
-      const ddbRecord = JSON.parse(record.body);
-      let toFirehose = {};
+                const delivery_stream = streams.includes(`handl-js-${domain}`) 
+                    ? `handl-js-${domain}` 
+                    : 'HandJStoS3';
+                
+                console.log("Delivery Stream Predicted As:" + delivery_stream);
 
-      if (ddbRecord["domain"]) {
-        ddbRecord["domain"] = ddbRecord["domain"].replace(/^.www/, "");
-        let domain = ddbRecord["domain"].replace(/^.www/, "").replace(/^./, "");
+                // Send to first stream
+                await firehose.putRecord({
+                    DeliveryStreamName: delivery_stream,
+                    Record: { 
+                        Data: Buffer.from(JSON.stringify(toFirehose) + '\n')
+                    }
+                });
 
-        // Prepare data to send to Firehose
-        for (const c in ddbRecord) {
-          if (c !== "handl_utm") {
-            toFirehose[c] = ddbRecord[c];
-          } else {
-            const handl_obj = ddbRecord[c];
-            for (const cc in handl_obj) {
-              toFirehose[cc] = handl_obj[cc];
+                // Send to UTMSimpleSingleStream
+                try {
+                    console.log("Sending to UTMSimpleSingleStream");
+                    await firehose.putRecord({
+                        DeliveryStreamName: "UTMSimpleSingleStream",
+                        Record: { 
+                            Data: Buffer.from(JSON.stringify(toFirehose) + '\n')
+                        }
+                    });
+                } catch (err) {
+                    console.error("Error sending record to UTMSimpleSingleStream:", err);
+                }
             }
-          }
         }
-
-        let jtoFirehose = JSON.stringify(toFirehose);
-        let params = {
-          DeliveryStreamName: "UTMSimpleSingleStream",
-          Record: {
-            Data: jtoFirehose,
-          },
-        };
-
-        try {
-          firehose.putRecord(params, function (err, data) {
-            if (err) console.log(err, err.stack); // an error occurred
-            else console.log(data); // successful response
-          });
-        } catch (err) {
-          console.error("Error sending record to Firehose:", err);
-        }
-      } else {
-        console.warn("No domain found in record:", record.body);
-      }
+    } catch (err) {
+        console.error('Error:', err);
     }
-  } catch (e) {
-    console.log(e);
-  }
 
     return `Successfully processed ${event.Records.length} records.`;
-}
+};
 
+// Test event data remains the same
 if (require.main === module) {
-    var event = {
+    const event = {
         "Records": [
             {
-                "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
-                "receiptHandle": "AQEBwJnKyrHigUMZj6rYigCgxlaS3SLy0a...",
-                "body": '{"domain":".www.utmgrabber.me","ip":"2600:1700:156:410:c466:ca4b:28ae:45ff","user_agent":"Mozilla/5.0 (Macintosh; Intel Mac OS X 11_2_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.192 Safari/537.36","url":"https://handl-js/","event_id":"b9b4296b-d2fa-427b-8944-84f569f204fb","license":"NA","date":"2021-03-05T05:51:04.814Z","handl_utm":{"utm_source":"sourcex","utm_medium":"medium","utm_term":"term","utm_content":"content","utm_campaign":"campaign","gaclientid":"520309381.1613187441","handl_custom1":"customvalue1"}}',
-                "attributes": {
-                    "ApproximateReceiveCount": "1",
-                    "SentTimestamp": "1545082649183",
-                    "SenderId": "AIDAIENQZJOLO23YVJ4VO",
-                    "ApproximateFirstReceiveTimestamp": "1545082649185"
+                "eventID": "1",
+                "eventVersion": "1.0",
+                "dynamodb": {
+                    "ApproximateCreationDateTime": 1616303297,
+                    "Keys": {
+                        "event_id": {
+                            "S": "8fd8fd92-3735-4092-949b-af0d57420136"
+                        }
+                    },
+                    "NewImage": {
+                        "date": {
+                            "S": "2021-03-21T05:08:17.238Z"
+                        },
+                        "license": {
+                            "S": "hM3FGCTcyn"
+                        },
+                        "event_id": {
+                            "S": "8fd8fd92-3735-4092-949b-af0d57420136"
+                        },
+                        "domain": {
+                            "S": ".plr.me"
+                        },
+                        "ip": {
+                            "S": "2600:8807:ac04:ca00:a819:4dd9:1b15:83ae"
+                        },
+                        "handl_utm": {
+                            "M": {
+                                "_fbp": {
+                                    "S": "fb.1.1616216569161.1110841964"
+                                }
+                            }
+                        },
+                        "url": {
+                            "S": "https://www.plr.me/content/popular"
+                        },
+                        "user_agent": {
+                            "S": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) GSA/149.1.361256237 Mobile/15E148 Safari/604.1"
+                        }
+                    },
+                    "SequenceNumber": "141648300000000007958849300",
+                    "SizeBytes": 422,
+                    "StreamViewType": "NEW_AND_OLD_IMAGES"
                 },
-                "messageAttributes": {},
-                "md5OfBody": "098f6bcd4621d373cade4e832627b4f6",
-                "eventSource": "aws:sqs",
-                "eventSourceARN": "arn:aws:sqs:us-east-2:123456789012:my-queue",
-                "awsRegion": "us-east-2"
+                "awsRegion": "us-east-1",
+                "eventName": "INSERT",
+                "eventSourceARN": "arn:aws:dynamodb:us-east-1:account-id:table/ExampleTableWithStream/stream/2015-06-27T00:48:05.899",
+                "eventSource": "aws:dynamodb"
             }
         ]
-    }
-    exports.handler(event)
+    };
+
+    exports.handler(event, {})
+        .then(console.log)
+        .catch(console.error);
 }

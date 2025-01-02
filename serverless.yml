@@ -2,12 +2,14 @@ service: handl-js
 
 provider:
   name: aws
-  runtime: nodejs12.x
-  memorySize: 128
+  runtime: nodejs20.x
+  memorySize: 256
   timeout: 10
   stage: prod
   profile: handl
   endpointType: REGIONAL
+  httpApi:
+    cors: true
 
 package:
   exclude:
