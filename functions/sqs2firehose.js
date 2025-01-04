@@ -1,10 +1,10 @@
 const { Firehose } = require("@aws-sdk/client-firehose");
-const { fromIni } = require("@aws-sdk/credential-providers");
+// const { fromIni } = require("@aws-sdk/credential-providers");
 
 // Configure Firehose client
 const firehose = new Firehose({ 
     region: 'us-east-1',
-    credentials: fromIni({ profile: 'handl' }) // Comment out for production
+    // credentials: fromIni({ profile: 'handl' }) // Comment out for production
 });
 
 exports.handler = async (event, context) => {
