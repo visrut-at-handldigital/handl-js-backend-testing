@@ -1,124 +1,76 @@
-var AWS = require("aws-sdk");
+const { Firehose } = require("@aws-sdk/client-firehose");
+// const { fromIni } = require("@aws-sdk/credential-providers");
 
-//Local settings only!!! not for production
-// var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
-// AWS.config.update({credentials: credentials});
+// Configure Firehose client
+const firehose = new Firehose({ 
+    region: 'us-east-1',
+    // credentials: fromIni({ profile: 'handl' }) // Comment out for production
+});
 
-AWS.config.update({region: 'us-east-1'});
-
-exports.handler = function(event, context) {
-    // console.log(event)
-
-    var firehose = new AWS.Firehose();
-
-    var params2 = {
+exports.handler = async (event, context) => {
+    const params = {
         DeliveryStreamType: "DirectPut",
         ExclusiveStartDeliveryStreamName: 'handl-js',
-        Limit: '100'
+        Limit: 100
     };
-    firehose.listDeliveryStreams(params2,function(err,lsd){
-        if (err) console.log(err, err.stack); // an error occurred
-        else {
-            // console.log(lsd)
-            let streams = lsd['DeliveryStreamNames']
 
-            for (const record of event.Records) {
-                // console.log('DynamoDB Record: %j', record.body);
+    try {
+        const { DeliveryStreamNames: streams } = await firehose.listDeliveryStreams(params);
+        
+        for (const record of event.Records) {
+            const ddbRecord = JSON.parse(record.body);
+            if (!ddbRecord.domain) continue;
 
-                const ddbRecord = JSON.parse(record.body);
-                let toFirehose = {}
+            const toFirehose = {};
+            const domain = ddbRecord.domain.replace(/^.www/, '').replace(/^./, '');
 
-                if (ddbRecord['domain']){
-                    ddbRecord['domain'] = ddbRecord['domain'].replace(/^.www/, '')
-                    let domain = ddbRecord['domain'].replace(/^.www/, '').replace(/^./, '')
-
-                    for (const c in ddbRecord) {
-                        if (c != 'handl_utm')
-                            toFirehose[c] = ddbRecord[c]
-                        else {
-                            const handl_obj = ddbRecord[c]
-                            for (const cc in handl_obj) {
-                                toFirehose[cc] = handl_obj[cc]
-                            }
-                        }
-                    }
-                    // console.log(toFirehose)
-
-                    let jtoFirehose = JSON.stringify(toFirehose)
-                    let delivery_stream = 'handl-js-' + domain
-                    if (streams.indexOf(delivery_stream) === -1){
-                        delivery_stream = 'HandJStoS3'
-                    }
-                    // console.log("Delivery Stream Predicted As:" + delivery_stream)
-
-                    let params3 = {
-                        DeliveryStreamName: delivery_stream, /* required */
-                        Record: { /* required */
-                            Data: jtoFirehose + '\n'
-                        }
-                    };
-                    firehose.putRecord(params3, function(err, data) {
-                        if (err) console.log(err, err.stack); // an error occurred
-                        //else     console.log(data);           // successful response
-                    });
-                }else{
-                    //No domain
+            // Process all fields except handl_utm
+            for (const [key, value] of Object.entries(ddbRecord)) {
+                if (key !== 'handl_utm') {
+                    toFirehose[key] = value;
+                } else {
+                    // Spread UTM parameters into main object
+                    Object.assign(toFirehose, value);
                 }
-      }
-    }
-  });
-
-  /* new logic */
-  try {
-    for (const record of event.Records) {
-      const ddbRecord = JSON.parse(record.body);
-      let toFirehose = {};
-
-      if (ddbRecord["domain"]) {
-        ddbRecord["domain"] = ddbRecord["domain"].replace(/^.www/, "");
-        let domain = ddbRecord["domain"].replace(/^.www/, "").replace(/^./, "");
-
-        // Prepare data to send to Firehose
-        for (const c in ddbRecord) {
-          if (c !== "handl_utm") {
-            toFirehose[c] = ddbRecord[c];
-          } else {
-            const handl_obj = ddbRecord[c];
-            for (const cc in handl_obj) {
-              toFirehose[cc] = handl_obj[cc];
             }
-          }
-        }
 
-        let jtoFirehose = JSON.stringify(toFirehose);
-        let params = {
-          DeliveryStreamName: "UTMSimpleSingleStream",
-          Record: {
-            Data: jtoFirehose,
-          },
-        };
+            const delivery_stream = streams.includes(`handl-js-${domain}`) 
+                ? `handl-js-${domain}` 
+                : 'HandJStoS3';
+            
+            console.log("Delivery Stream Predicted As:" + delivery_stream);
 
-        try {
-          firehose.putRecord(params, function (err, data) {
-            if (err) console.log(err, err.stack); // an error occurred
-            else console.log(data); // successful response
-          });
-        } catch (err) {
-          console.error("Error sending record to Firehose:", err);
+            // Send to first stream
+            await firehose.putRecord({
+                DeliveryStreamName: delivery_stream,
+                Record: { 
+                    Data: Buffer.from(JSON.stringify(toFirehose) + '\n')
+                }
+            });
+
+            // Send to UTMSimpleSingleStream
+            try {
+                console.log("Sending to UTMSimpleSingleStream");
+                await firehose.putRecord({
+                    DeliveryStreamName: "UTMSimpleSingleStream",
+                    Record: { 
+                        Data: Buffer.from(JSON.stringify(toFirehose) + '\n')
+                    }
+                });
+            } catch (err) {
+                console.error("Error sending record to UTMSimpleSingleStream:", err);
+            }
         }
-      } else {
-        console.warn("No domain found in record:", record.body);
-      }
+    } catch (err) {
+        console.error('Error:', err);
     }
-  } catch (e) {
-    console.log(e);
-  }
 
     return `Successfully processed ${event.Records.length} records.`;
-}
+};
 
+// Test event data for SQS
 if (require.main === module) {
-    var event = {
+    const event = {
         "Records": [
             {
                 "messageId": "059f36b4-87a3-44ab-83d2-661975830a7d",
@@ -137,6 +89,9 @@ if (require.main === module) {
                 "awsRegion": "us-east-2"
             }
         ]
-    }
-    exports.handler(event)
+    };
+
+    exports.handler(event, {})
+        .then(console.log)
+        .catch(console.error);
 }

@@ -1,12 +1,10 @@
-var AWS = require("aws-sdk");
+const { Athena } = require("@aws-sdk/client-athena");
+// const { fromIni } = require("@aws-sdk/credential-providers");
 
-//Local settings only!!! not for production
-var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
-AWS.config.update({credentials: credentials});
-
-AWS.config.update({region: 'us-east-1'});
-
-var athena = new AWS.Athena();
+const athena = new Athena({ 
+    region: 'us-east-1'
+    // credentials: process.env.AWS_PROFILE ? fromIni({ profile: 'handl' }) : undefined
+});
 
 'use strict';
 

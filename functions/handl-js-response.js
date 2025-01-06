@@ -1,9 +1,12 @@
-var AWS = require("aws-sdk");
+const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const { fromIni } = require("@aws-sdk/credential-providers");
 
-//Local settings only!!! not for production
-// var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
-// AWS.config.update({credentials: credentials});
-AWS.config.update({region: 'us-east-1'});
+// Configure DynamoDB client
+// For local development with profile 'handl', uncomment the credentials line below
+const dynamodb = new DynamoDB({ 
+    region: 'us-east-1',
+    // credentials: fromIni({ profile: 'handl' }) // Uncomment for local development
+});
 
 'use strict';
 
@@ -81,13 +84,11 @@ exports.handler = (event, context, callback) => {
     }
 };
 
-function getInvoice(license_key, domain){
-    var dynamodb = new AWS.DynamoDB();
-
+async function getInvoice(license_key, domain) {
     const params = {
         TableName: 'UTMGrabberLicense',
-        KeyConditionExpression:"#license = :license",
-        ExpressionAttributeNames:{
+        KeyConditionExpression: "#license = :license",
+        ExpressionAttributeNames: {
             "#license": "license_key",
             "#st": "status",
             "#ad": "allowed_domains"
@@ -102,9 +103,7 @@ function getInvoice(license_key, domain){
         ProjectionExpression: 'allowed_domains, #st'
     };
 
-    // console.log("dynamodb.query started with the params below")
-    // console.log(params)
-    return  dynamodb.query(params).promise();
+    return await dynamodb.query(params);
 }
 
 function getParameterByName(name, querystring) {
