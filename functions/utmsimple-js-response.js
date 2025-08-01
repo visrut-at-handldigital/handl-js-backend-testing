@@ -15,7 +15,7 @@ exports.handler = async (event) => {
 
   let domain = headers.referer ? headers.referer[0].value : "";
 
-  if (domain === "") {
+  if (!domain) {
     console.log("NOTOK3");
     return {
       status: "403",
