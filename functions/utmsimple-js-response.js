@@ -1,142 +1,121 @@
-var AWS = require("aws-sdk");
-var tldjs = require("./tld/index")
+"use strict";
+const { DynamoDB } = require("@aws-sdk/client-dynamodb");
+const tldjs = require("./tld/index");
 const { getDomain } = tldjs;
 
+const dynamodb = new DynamoDB({
+  region: "us-east-1",
+});
 
-//Local settings only!!! not for production
-// var credentials = new AWS.SharedIniFileCredentials({profile: 'handl'});
-// AWS.config.update({credentials: credentials});
-AWS.config.update({region: 'us-east-1'});
+exports.handler = async (event) => {
+  console.log(JSON.stringify(event));
 
-'use strict';
+  const request = event.Records[0].cf.request;
+  const headers = request.headers;
 
-exports.handler = (event, context, callback) => {
-    console.log(JSON.stringify(event));
+  let domain = headers.referer ? headers.referer[0].value : "";
 
-    const request = event.Records[0].cf.request;
-    const headers = request.headers;
+  if (domain === "") {
+    console.log("NOTOK3");
+    return {
+      status: "403",
+      statusDescription: "No direct access!",
+      body: "Contact utmsimple.com if this is not intended",
+    };
+  }
 
-    let domain =  headers.referer ? headers.referer[0].value : '';
+  domain = getDomain(domain);
+  const querystring = request.querystring;
+  const license = getParameterByName("license", querystring);
 
-    if ( domain != '' ){
+  if (!license) {
+    console.log("NOTOK2");
+    return {
+      status: "403",
+      statusDescription: "You need a license to use",
+      body: "Contact utmsimple.com to get a license",
+    };
+  }
 
-        domain = getDomain(domain)
+  try {
+    console.log("Domain: " + domain);
+    console.log("License: " + license);
 
-        const querystring = request.querystring;
-        const license = getParameterByName('license',querystring);
+    const licenseResult = await getInvoice(license, domain);
 
-        // console.log(domain)
-        // console.log(parseResult)
-        // process.exit()
-
-        if (license != '' && license != null){
-            console.log("Domain: "+domain);
-            console.log("License: "+license);
-
-            getInvoice(license, domain).then( license => {
-                // console.log(license)
-                // console.log(request)
-                if (license.Count > 0){
-                    callback(null, request);
-                    return;
-                }else{
-                    // console.log("Payment required")
-                    console.log("NOTOK1");
-                    const response = {
-                        status: '402',
-                        statusDescription: 'Payment Required',
-                        body: "Payment required!"
-                    };
-                    callback(null, response);
-                }
-            }).catch( err => {
-                console.log("entering catch block");
-                console.log(request)
-                console.log(err.message);
-
-                //let them still use the plugin
-                callback(null, request);
-                return;
-            })
-        }else{
-            console.log("NOTOK2");
-            const response = {
-                status: '402',
-                statusDescription: 'You need a license to use',
-                body: "Contact utmsimple.com to get a license"
-            };
-            callback(null, response);
-        }
-    }else{
-        // Direct access
-        console.log("NOTOK3");
-        const response = {
-            status: '402',
-            statusDescription: 'No direct access!',
-            body: "Contact utmsimple.com if this is not intended"
-        };
-        callback(null, response);
+    if (licenseResult.Count > 0) {
+      return request;
+    } else {
+      console.log("NOTOK1");
+      return {
+        status: "402",
+        statusDescription: "Payment Required",
+        body: "Payment required!",
+      };
     }
+  } catch (err) {
+    console.log("entering catch block");
+    console.log(request);
+    console.log(err.message);
+
+    return request;
+  }
 };
 
-function getInvoice(license_key, domain){
-    var dynamodb = new AWS.DynamoDB();
+async function getInvoice(license_key, domain) {
+  const params = {
+    TableName: "UTMSimpleLicenses",
+    KeyConditionExpression: "#license = :license",
+    ExpressionAttributeNames: {
+      "#license": "license_key",
+      "#st": "status",
+      "#ad": "allowed_domains",
+    },
+    ExpressionAttributeValues: {
+      ":license": { S: license_key },
+      ":st": { S: "activated" },
+      ":ad": { S: domain },
+    },
+    FilterExpression: "#st = :st AND contains(#ad,:ad)",
+    ProjectionExpression: "#ad, #st",
+  };
 
-    const params = {
-        TableName: 'UTMSimpleLicenses',
-        KeyConditionExpression:"#license = :license",
-        ExpressionAttributeNames:{
-            "#license": "license_key",
-            "#st": "status",
-            "#ad": "allowed_domains"
-        },
-        ExpressionAttributeValues: {
-            ":license": { S: license_key },
-            ":st": { S: "activated" },
-            ":ad": { S: domain }
-        },
-        FilterExpression: "#st = :st AND contains(#ad,:ad)",
-        ProjectionExpression: '#ad, #st'
-    };
+  const res = await dynamodb.query(params);
 
-    // console.log("dynamodb.query started with the params below")
-    // console.log(params)
-    return  dynamodb.query(params).promise();
+  return res;
 }
 
 function getParameterByName(name, querystring) {
-    name = name.replace(/[\[\]]/g, '\\$&');
-    var regex = new RegExp(name + '(=([^&#]*)|&|#|$)'),
-        results = regex.exec(querystring);
-    if (!results) return null;
-    if (!results[2]) return '';
-    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+  name = name.replace(/[\[\]]/g, "\\$&");
+  const regex = new RegExp(name + "(=([^&#]*)|&|#|$)"),
+    results = regex.exec(querystring);
+  if (!results) return null;
+  if (!results[2]) return "";
+  return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
-
 if (require.main === module) {
-    var event = {
-        "Records": [
-            {
-                "cf": {
-                    "request": {
-                        "headers": {
-                            "referer": [
-                                {
-                                    "key": "referer",
-                                    "value": "https://utmsimple.com"
-                                }
-                            ]
-                        },
-                        "method": "GET",
-                        "querystring": "license=41879844023811eca489acde48001122",
-                        "uri": "/utm.js"
-                    }
-                }
-            }
-        ]
-    }
+  const event = {
+    Records: [
+      {
+        cf: {
+          request: {
+            headers: {
+              referer: [
+                {
+                  key: "referer",
+                  value: "https://utmsimple.com",
+                },
+              ],
+            },
+            method: "GET",
+            querystring: "license=41879844023811eca489acde48001122",
+            uri: "/utm.js",
+          },
+        },
+      },
+    ],
+  };
 
-    this.handler(event, '', function(e,b){console.log(b)})
-
+  this.handler(event);
 }

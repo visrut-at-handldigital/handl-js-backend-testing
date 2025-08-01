@@ -34,13 +34,13 @@ custom:
     - sqs:
         path: /event
         method: post
-        queueName: { 'Fn::GetAtt': ['SQSQueue', 'QueueName'] }
+        queueName: { "Fn::GetAtt": ["SQSQueue", "QueueName"] }
         cors: true
 
 resources:
   Resources:
     SQSQueue:
-      Type: 'AWS::SQS::Queue'
+      Type: "AWS::SQS::Queue"
 
 functions:
   sqs2firehose:
@@ -53,14 +53,26 @@ functions:
               - Arn
     iamRoleStatementsName: lambda-sqs2firehose-custom-role
     iamRoleStatements:
-        - Effect: "Allow"
-          Action:
-            - firehose:PutRecord
-          Resource: { 'Fn::Join': [ ':', [ 'arn:aws:firehose', { Ref: 'AWS::Region' }, { Ref: 'AWS::AccountId' }, 'deliverystream/*' ] ] }
-        - Effect: "Allow"
-          Action:
-            - firehose:ListDeliveryStreams
-          Resource: "*"
+      - Effect: "Allow"
+        Action:
+          - firehose:PutRecord
+        Resource:
+          {
+            "Fn::Join":
+              [
+                ":",
+                [
+                  "arn:aws:firehose",
+                  { Ref: "AWS::Region" },
+                  { Ref: "AWS::AccountId" },
+                  "deliverystream/*",
+                ],
+              ],
+          }
+      - Effect: "Allow"
+        Action:
+          - firehose:ListDeliveryStreams
+        Resource: "*"
 
   report:
     handler: functions/report.handler
@@ -77,7 +89,19 @@ functions:
       - Effect: "Allow"
         Action:
           - dynamodb:Query
-        Resource: { 'Fn::Join': [ ':', [ 'arn:aws:dynamodb', '*', { Ref: 'AWS::AccountId' }, 'table/UTMGrabberLicense' ] ] }
+        Resource:
+          {
+            "Fn::Join":
+              [
+                ":",
+                [
+                  "arn:aws:dynamodb",
+                  "*",
+                  { Ref: "AWS::AccountId" },
+                  "table/UTMGrabberLicense",
+                ],
+              ],
+          }
 
   utmsimpleresponse:
     handler: functions/utmsimple-js-response.handler
@@ -87,4 +111,16 @@ functions:
       - Effect: "Allow"
         Action:
           - dynamodb:Query
-        Resource: { 'Fn::Join': [ ':', [ 'arn:aws:dynamodb', '*', { Ref: 'AWS::AccountId' }, 'table/UTMSimpleLicenses' ] ] }
+        Resource:
+          {
+            "Fn::Join":
+              [
+                ":",
+                [
+                  "arn:aws:dynamodb",
+                  "*",
+                  { Ref: "AWS::AccountId" },
+                  "table/UTMSimpleLicenses",
+                ],
+              ],
+          }
