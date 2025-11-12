@@ -17,11 +17,11 @@ exports.handler = async (event, context) => {
 
             // Process all fields except handl_utm
             for (const [key, value] of Object.entries(ddbRecord)) {
-                if (key !== 'handl_utm') {
-                    toFirehose[key] = value;
-                } else {
+                if (key === 'handl_utm') {
                     // Spread UTM parameters into main object
                     Object.assign(toFirehose, value);
+                } else {
+                    toFirehose[key] = value;
                 }
             }
 
