@@ -8,58 +8,30 @@ const firehose = new Firehose({
 });
 
 exports.handler = async (event, context) => {
-    const params = {
-        DeliveryStreamType: "DirectPut",
-        ExclusiveStartDeliveryStreamName: 'handl-js',
-        Limit: 100
-    };
-
-    try {
-        const { DeliveryStreamNames: streams } = await firehose.listDeliveryStreams(params);
-        
+    try {        
         for (const record of event.Records) {
             const ddbRecord = JSON.parse(record.body);
             if (!ddbRecord.domain) continue;
 
             const toFirehose = {};
-            const domain = ddbRecord.domain.replace(/^.www/, '').replace(/^./, '');
 
             // Process all fields except handl_utm
             for (const [key, value] of Object.entries(ddbRecord)) {
-                if (key !== 'handl_utm') {
-                    toFirehose[key] = value;
-                } else {
+                if (key === 'handl_utm') {
                     // Spread UTM parameters into main object
                     Object.assign(toFirehose, value);
+                } else {
+                    toFirehose[key] = value;
                 }
             }
 
-            const delivery_stream = streams.includes(`handl-js-${domain}`) 
-                ? `handl-js-${domain}` 
-                : 'HandJStoS3';
-            
-            console.log("Delivery Stream Predicted As:" + delivery_stream);
-
-            // Send to first stream
+            console.log("Sending to UTMSimpleSingleStream");
             await firehose.putRecord({
-                DeliveryStreamName: delivery_stream,
+                DeliveryStreamName: "UTMSimpleSingleStream",
                 Record: { 
                     Data: Buffer.from(JSON.stringify(toFirehose) + '\n')
                 }
             });
-
-            // Send to UTMSimpleSingleStream
-            try {
-                console.log("Sending to UTMSimpleSingleStream");
-                await firehose.putRecord({
-                    DeliveryStreamName: "UTMSimpleSingleStream",
-                    Record: { 
-                        Data: Buffer.from(JSON.stringify(toFirehose) + '\n')
-                    }
-                });
-            } catch (err) {
-                console.error("Error sending record to UTMSimpleSingleStream:", err);
-            }
         }
     } catch (err) {
         console.error('Error:', err);
