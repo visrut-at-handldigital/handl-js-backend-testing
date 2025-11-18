@@ -20,6 +20,23 @@ exports.handler = async (event, context) => {
                 if (key === 'handl_utm') {
                     // Spread UTM parameters into main object
                     Object.assign(toFirehose, value);
+                } else if (key === 'extra_params') {
+                    // Flatten extra_params: add simple values directly, flatten objects by 1 level
+                    for (const [paramKey, paramValue] of Object.entries(value)) {
+                        if (typeof paramValue === 'object' && paramValue !== null && !Array.isArray(paramValue)) {
+                            // Flatten one level deep with underscore concatenation
+                            for (const [nestedKey, nestedValue] of Object.entries(paramValue)) {
+                                // Only add if nestedValue is a primitive (not an object)
+                                if (typeof nestedValue !== 'object' || nestedValue === null) {
+                                    toFirehose[`${paramKey}_${nestedKey}`] = nestedValue;
+                                }
+                                // Ignore if nestedValue is an object (no recursive flattening)
+                            }
+                        } else {
+                            // Simple value (string, number, boolean, null, array), add directly
+                            toFirehose[paramKey] = paramValue;
+                        }
+                    }
                 } else {
                     toFirehose[key] = value;
                 }
