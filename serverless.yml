@@ -1,3 +1,9 @@
+# "org" ensures this Service is used with the correct Serverless Framework Access Key.
+org: utmsimple
+
+# "app" enables Serverless Framework Dashboard features and sharing them with other Services.
+app: handl-js-backend
+
 service: handl-js
 
 provider:
@@ -20,7 +26,6 @@ package:
 plugins:
   - serverless-apigateway-service-proxy
   - serverless-iam-roles-per-function
-  - serverless-plugin-layer-manager
 
 layers:
   hjnodelib:

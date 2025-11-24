@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [master, dev]
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'dev' }}
+    env:
+      ENV_MODE: ${{ github.ref == 'refs/heads/master' && 'prod' || 'dev' }}
+      AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+      SERVERLESS_ACCESS_KEY: ${{ vars.SERVERLESS_ACCESS_KEY }}
+    steps:
+      - name: Print
+        run: echo "We are on ${{ github.ref == 'refs/heads/master' && 'production' || 'dev' }} and deploying to ${{ vars.AWS_DEFAULT_REGION }}"
+
+      - name: Checkout 🛎️
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installing Modules
+        run: npm install
+
+      - name: Bundle and repackage
+        run: npm run package
+
+      - name: Deploy
+        if: github.event_name == 'push'
+        run: npx sls deploy --package .serverless
