@@ -4,14 +4,15 @@
   "description": "",
   "main": "index.js",
   "devDependencies": {
-    "serverless": "^3.38.0",
-    "serverless-apigateway-service-proxy": "^2.2.1",
+    "serverless": "^4.17.1",
+    "serverless-apigateway-service-proxy": "^2.2.2",
     "serverless-iam-roles-per-function": "^3.2.0",
     "serverless-plugin-layer-manager": "^1.1.1"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "deploy": "./build-layer.sh && serverless deploy"
+    "deploy": "./build-layer.sh && serverless deploy",
+    "package": "sls package"
   },
   "repository": {
     "type": "git",
