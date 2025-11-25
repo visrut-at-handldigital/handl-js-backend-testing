@@ -1,8 +1,8 @@
 # "org" ensures this Service is used with the correct Serverless Framework Access Key.
-org: utmsimple
+org: visrutorg
 
 # "app" enables Serverless Framework Dashboard features and sharing them with other Services.
-app: handl-js-backend
+app: handl-js-backend-testing
 
 service: handl-js
 
