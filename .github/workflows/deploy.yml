@@ -29,6 +29,9 @@ jobs:
       - name: Installing Modules
         run: npm install
 
+      - name: Build Lambda Layer
+        run: bash build-layer.sh
+
       - name: Bundle and repackage
         run: npm run package
 
